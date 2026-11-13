@@ -1,0 +1,40 @@
+name: Spot intraday
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes (GitHub may delay runs a few minutes)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: spot-intraday
+  cancel-in-progress: false
+
+jobs:
+  intraday:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Run intraday analyst
+        env:
+          ALERT_EMAIL_USER: ${{ secrets.ALERT_EMAIL_USER }}
+          ALERT_EMAIL_PASS: ${{ secrets.ALERT_EMAIL_PASS }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+        run: python analyst.py --mode intraday
+
+      - name: Save state
+        run: |
+          git config user.name "analyst-bot"
+          git config user.email "analyst-bot@users.noreply.github.com"
+          git add intraday_state.json
+          git diff --staged --quiet || (git commit -m "update intraday state" && git pull --rebase && git push)
